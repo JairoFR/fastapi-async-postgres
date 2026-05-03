@@ -7,19 +7,22 @@ class Settings(BaseSettings):
     Configuración central de la aplicación.
     Lee automáticamente desde el archivo .env
     """
-    # ConfigDict reemplaza la clase Config interna
-    # es la forma correcta en Pydantic V2
     model_config = ConfigDict(env_file=".env")
 
     # Datos básicos de la API
-    app_name: str = "Motor Facturas API"
+    app_name: str = "FastAPI Async PostgreSQL"
     version: str = "1.0.0"
-    description: str = "API profesional para gestión de facturas"
+    description: str = "API con PostgreSQL async y SQLAlchemy"
     debug: bool = False
 
-# lru_cache = guarda la configuración en memoria
-# evita leer el archivo .env en cada petición
-# es como un singleton — solo se crea una vez
+    # Base de datos
+    # postgresql+asyncpg = driver async para PostgreSQL
+    database_url: str = "postgresql+asyncpg://fastapi_user:fastapi123@localhost/fastapi_db"
+
+    # JWT
+    secret_key: str = "clave-secreta-cambiar-en-produccion"
+    access_token_expire_minutes: int = 30
+
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()

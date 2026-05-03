@@ -1,28 +1,35 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from app.routers import items
+from app.routers import auth, tareas
 from app.core.config import get_settings
+from app.core.database import engine, Base
 import logging
 
-#pip install fastapi uvicorn pydantic pydantic-settings pytest httpx python-dotenv
-
-# Logger para producción
 logger = logging.getLogger(__name__)
-
-# Carga configuración
 settings = get_settings()
 
-# Crea la aplicación
+# ── Lifespan ──────────────────────────────────────────
+# Se ejecuta al arrancar y apagar la aplicación
+# Crea las tablas en PostgreSQL automáticamente
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Al arrancar — crea tablas si no existen
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    # Al apagar — cierra conexiones
+    await engine.dispose()
+
+# Crea la aplicación con lifespan
 app = FastAPI(
     title=settings.app_name,
     version=settings.version,
     description=settings.description,
+    lifespan=lifespan,
 )
 
 # ── Manejo global de errores ──────────────────────────
-# Captura CUALQUIER error no manejado en toda la API
-# Desarrollo: muestra detalle
-# Producción: ocultar detalle y loguear
 @app.exception_handler(Exception)
 async def error_global(request: Request, exc: Exception):
     logger.error(
@@ -33,13 +40,11 @@ async def error_global(request: Request, exc: Exception):
         status_code=500,
         content={
             "error": "Error interno del servidor",
-            "detalle": str(exc)  # ← quitar en producción
+            "detalle": str(exc)
         }
     )
 
 # ── Healthcheck ───────────────────────────────────────
-# Endpoint que usan servidores para saber si la API está viva
-# Docker, Railway, AWS lo llaman automáticamente
 @app.get("/health", tags=["Sistema"])
 def health():
     return {
@@ -49,5 +54,5 @@ def health():
     }
 
 # ── Registrar routers ─────────────────────────────────
-# Agrega aquí tus routers según el proyecto
-app.include_router(items.router)
+app.include_router(auth.router)
+app.include_router(tareas.router)
